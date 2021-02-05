@@ -11,5 +11,5 @@ ${OpenCV_INCLUDE_DIRS}
 )
 
 
-add_executable( gms_match_demo ./test/demo.cpp )
+add_executable( gms_match_demo ./test/demo.cc )
 target_link_libraries( gms_match_demo ${OpenCV_LIBS} )
