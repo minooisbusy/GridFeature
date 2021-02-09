@@ -1,0 +1,1 @@
+./bin/grid_feature data/Lenna.png settings/TUM1.yaml
