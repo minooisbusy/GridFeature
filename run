@@ -1,1 +1,1 @@
-./bin/grid_feature data/Lenna.png settings/TUM1.yaml
+./bin/grid_feature data/Lenna.png data/Lenna.png settings/TUM1.yaml

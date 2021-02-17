@@ -1,26 +1,36 @@
-cmake_minimum_required(VERSION 3.0)
-project( grid_feature)
+CMAKE_MINIMUM_REQUIRED( VERSION 3.0 )
+PROJECT( grid_feature )
 
-# Output binary file directory setting
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3 -march=native")
+
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++17" COMPILER_SUPPORTS_CXX17)
+if(COMPILER_SUPPORTS_CXX17)
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+     add_definitions(-DCOMPILERWITHC17)
+     message(STATUS " Using flag -std=c++17.")
+endif()
+
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 
-# source files
-set ( SRC_FILES test/demo.cc src/feature.cc)
+find_package(OpenCV REQUIRED)
 
-# OpenCV 
-find_package( OpenCV REQUIRED )
 
-include_directories( 
-${PROJECT_SOURCE_DIR}
+include_directories(
+${PROJECT_SOURCE_DIR}/include
+${OpenCV_INCLUDE_DIRS}
 )
 message(STATUS ${OpenCV})
 
-
-include_directories( include )
-
-add_executable( ${PROJECT_NAME} ${SRC_FILES} )
-
-
-target_link_libraries(${PROJECT_NAME} 
+add_executable(${PROJECT_NAME}
+src/matcher.cc
+src/feature.cc
+src/frame.cc
+test/demo.cc 
+)
+#TODO deactivate하고 돌려보기
+#set(OpenCV_LIBS /usr/local/lib/opencv4/opencv_*)
+target_link_libraries(${PROJECT_NAME}
 ${OpenCV_LIBS}
+${Eigen_LIBS}
 )

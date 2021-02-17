@@ -378,8 +378,12 @@ ORBextractor::ORBextractor(int _nfeatures, float _scaleFactor, int _nlevels,
 		sumFeatures += mnFeaturesPerLevel[level];
 		nDesiredFeaturePerScale *= factor;
 	}
-	mnFeaturesPerLevel[nlevels - 1] = std::max(nfeatures - sumFeatures, 0);
-   umax.resize(HALF_PATCH_SIZE + 1);
+    mnFeaturesPerLevel[nlevels - 1] = std::max(nfeatures - sumFeatures, 0);
+
+    const int npoints = 512;
+    const Point* pattern0 = (const Point*)bit_pattern_31_;
+    std::copy(pattern0, pattern0 + npoints, std::back_inserter(pattern));
+    umax.resize(HALF_PATCH_SIZE + 1);
 
     int v, v0, vmax = cvFloor(HALF_PATCH_SIZE * sqrt(2.f) / 2 + 1);
     int vmin = cvCeil(HALF_PATCH_SIZE * sqrt(2.f) / 2);
@@ -399,7 +403,6 @@ ORBextractor::ORBextractor(int _nfeatures, float _scaleFactor, int _nlevels,
 
 void ORBextractor::ComputePyramid(const cv::Mat &image)
 {
-    std::cout<<std::endl;
 	for(int level = 0; level < nlevels; level++)
 	{
 		float scale = mvInvScaleFactor[level];
@@ -475,10 +478,10 @@ std::vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const std::vector<cv::
             lit->bNoMore=true; // This node has just one feature
             lit++;
         }
-        else if(lit->vKeys.empty()) // No feature, so erase node
+        else if(lit->vKeys.empty()) // No feature, so erase node(grid)
             lit = lNodes.erase(lit);
         else
-            lit++; // see next feature
+            lit++; // see next grid
     }//END Initial Node construct
 
     //START Divide Node
@@ -528,7 +531,7 @@ std::vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const std::vector<cv::
                 }
                 if(n2.vKeys.size() > 0)
                 {
-                    lNodes.push_front(n1);
+                    lNodes.push_front(n2);
                     if(n2.vKeys.size() > 1)
                     {
                         nToExpand++;
@@ -539,23 +542,23 @@ std::vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const std::vector<cv::
                 }
                 if(n3.vKeys.size() > 0)
                 {
-                    lNodes.push_front(n1);
+                    lNodes.push_front(n3);
                     if(n3.vKeys.size() > 1)
                     {
                         nToExpand++;
                         // Contain Size of feature and root of node
-                        vSizeAndPointerToNode.push_back(make_pair(n1.vKeys.size(), &lNodes.front()));
+                        vSizeAndPointerToNode.push_back(make_pair(n3.vKeys.size(), &lNodes.front()));
                         lNodes.front().lit = lNodes.begin();
                     }
                 }
                 if(n4.vKeys.size() > 0)
                 {
-                    lNodes.push_front(n1);
+                    lNodes.push_front(n4);
                     if(n4.vKeys.size() > 1)
                     {
                         nToExpand++;
                         // Contain Size of feature and root of node
-                        vSizeAndPointerToNode.push_back(make_pair(n1.vKeys.size(), &lNodes.front()));
+                        vSizeAndPointerToNode.push_back(make_pair(n4.vKeys.size(), &lNodes.front()));
                         lNodes.front().lit = lNodes.begin();
                     }
                 }
@@ -571,7 +574,7 @@ std::vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const std::vector<cv::
         // The latter condition is that the previous list of Node size is
         // same present list of Node
 
-        if((int(lNodes.size()>=N)) || (int)lNodes.size() == prevSize)
+        if((int(lNodes.size()>=static_cast<size_t>(N))) || (int)lNodes.size() == prevSize)
         {
             bFinish = true;
         }
@@ -608,7 +611,7 @@ std::vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const std::vector<cv::
                     }
                     if(n2.vKeys.size() > 0)
                     {
-                        lNodes.push_front(n1);
+                        lNodes.push_front(n2);
                         if(n2.vKeys.size() > 1)
                         {
                             nToExpand++;
@@ -619,23 +622,23 @@ std::vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const std::vector<cv::
                     }
                     if(n3.vKeys.size() > 0)
                     {
-                        lNodes.push_front(n1);
+                        lNodes.push_front(n3);
                         if(n3.vKeys.size() > 1)
                         {
                             nToExpand++;
                             // Contain Size of feature and root of node
-                            vSizeAndPointerToNode.push_back(make_pair(n1.vKeys.size(), &lNodes.front()));
+                            vSizeAndPointerToNode.push_back(make_pair(n3.vKeys.size(), &lNodes.front()));
                             lNodes.front().lit = lNodes.begin();
                         }
                     }
                     if(n4.vKeys.size() > 0)
                     {
-                        lNodes.push_front(n1);
+                        lNodes.push_front(n4);
                         if(n4.vKeys.size() > 1)
                         {
                             nToExpand++;
                             // Contain Size of feature and root of node
-                            vSizeAndPointerToNode.push_back(make_pair(n1.vKeys.size(), &lNodes.front()));
+                            vSizeAndPointerToNode.push_back(make_pair(n4.vKeys.size(), &lNodes.front()));
                             lNodes.front().lit = lNodes.begin();
                         }
                     }
@@ -675,6 +678,14 @@ std::vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const std::vector<cv::
     return vResultKeys;
 }
 
+static void computeOrientation(const Mat& image, vector<KeyPoint>& keypoints, const vector<int>& umax)
+{
+    for(vector<KeyPoint>::iterator keypoint = keypoints.begin(),
+        keypointEnd = keypoints.end(); keypoint != keypointEnd; ++keypoint)
+    {
+        keypoint->angle = IC_Angle(image, keypoint->pt, umax);
+    }
+}
 
 void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint>>& allKeyPoints)
 {
@@ -744,18 +755,44 @@ void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint>>& allKeyPoint
         vector<KeyPoint> & keypoints = allKeyPoints[level];
         keypoints.reserve(nfeatures);
 
+        
+        // Is this NMS by OctTree??
         keypoints = DistributeOctTree(vToDistributeKeys, minBorderX, maxBorderX,
                                         minBorderY, maxBorderY, mnFeaturesPerLevel[level], level);
 
-        Mat RGB;
-        cvtColor(mvImagePyramid[level], RGB, CV_GRAY2RGB);
-        std::cout <<"#Key = " << keypoints.size()<<std::endl;
-        for(int i=0; i<keypoints.size();i++)
-            circle(RGB, keypoints[i].pt+Point2f(minBorderX,minBorderY),1,Scalar(0,255,0));
-        imshow("OctTree",RGB);
-        waitKey(0);
+        //Mat RGB;
+        //cvtColor(mvImagePyramid[level], RGB, CV_GRAY2RGB);
+        //std::cout <<"#Key = " << keypoints.size()<<std::endl;
+        //for(int i=0; i<keypoints.size();i++)
+        //    circle(RGB, keypoints[i].pt+Point2f(minBorderX,minBorderY),1,Scalar(0,255,0));
+        //imshow("OctTree",RGB);
+        //waitKey(0);
         const int scaledPatchSize = PATCH_SIZE*mvScaleFactor[level];
+
+        // Add border to coordinates and scale information
+        const int nkps = keypoints.size();
+        for(int i=0; i<nkps; i++)
+        {
+            keypoints[i].pt.x += minBorderX;
+            keypoints[i].pt.y += minBorderY;
+            keypoints[i].octave = level;
+            keypoints[i].size = scaledPatchSize;
+        }
     }
+
+    // compute orientations
+    for(int level = 0; level < nlevels; ++level)
+        computeOrientation(mvImagePyramid[level], allKeyPoints[level], umax);
+}
+
+static void computeDescriptors(const Mat& image, vector<KeyPoint>& keypoints, Mat& descriptors,
+                               const vector<Point>& pattern)
+{
+    //descriptors = Mat::zeros(static_cast<int>(keypoints.size()), 32, CV_8UC1);
+    descriptors.setTo(0);
+
+    for(size_t i = 0; i < keypoints.size(); i++)
+        computeOrbDescriptor(keypoints[i], image, &pattern[0], descriptors.ptr(static_cast<int>(i)));
 }
 
 void ORBextractor::operator()(cv::InputArray _image, cv::InputArray _mask,
@@ -766,18 +803,59 @@ void ORBextractor::operator()(cv::InputArray _image, cv::InputArray _mask,
 	Mat image = _image.getMat();
 	assert(image.type() == CV_8UC1);
 
-	ComputePyramid(image);
+	ComputePyramid(image); 
 
     vector<vector<KeyPoint>> allKeyPoints;
-    ComputeKeyPointsOctTree(allKeyPoints);
+    ComputeKeyPointsOctTree(allKeyPoints); //Grid-wise adjust FAST Threshold and NMS by OctTree???
 
-	for(int level = 0; level < nlevels; level++)
-	{			
-		string s = to_string(level) + " - image";
-		imshow(s, mvImagePyramid[level]);
-	}
-	waitKey(0);
+    // Compute Descriptors
+    Mat descriptors;
+
+    int nkeypoints = 0;
+    for(int level = 0; level < nlevels; ++level)
+        nkeypoints +=(int)allKeyPoints[level].size();
+    if(nkeypoints == 0)
+        _descriptors.release();
+    else
+    {
+        _descriptors.create(nkeypoints, 32, CV_8U);
+        descriptors = _descriptors.getMat();
+    }
+
+    _keypoints.clear();
+    _keypoints.reserve(nkeypoints);
+
+    int offset = 0;
+    for( int level = 0; level <nlevels; ++level)
+    {
+        vector<KeyPoint>& keypoints = allKeyPoints[level];
+        int nkeypointsLevel = static_cast<int>(keypoints.size());
+
+        if(nkeypointsLevel == 0)
+            continue;
+
+        // process the resized image
+        Mat workingMat = mvImagePyramid[level].clone();
+        GaussianBlur(workingMat, workingMat, Size(7,7), 2,2, BORDER_REFLECT_101);
+
+        // Compute the descriptors
+        Mat desc = descriptors.rowRange(offset, offset + nkeypointsLevel);
+        computeDescriptors(workingMat, keypoints, desc,pattern);
+
+        offset += nkeypointsLevel;
+
+        // Scale keypoint coordinates
+        if(level != 0)
+        {
+            const float scale = mvScaleFactor[level];
+            for(vector<KeyPoint>::iterator keypoint = keypoints.begin(),
+            keypointEnd = keypoints.end(); keypoint != keypointEnd; ++keypoint)
+                keypoint->pt *= scale;
+        }
+        _keypoints.insert(_keypoints.end(), keypoints.begin(), keypoints.end());
+    }
 }
+
 
 void ExtractorNode::DivideNode(ExtractorNode &n1, ExtractorNode &n2, ExtractorNode &n3, ExtractorNode &n4)
 {
